@@ -47,7 +47,7 @@ jobs:
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/benbenbang/reusable-workflows/semantic-release:${{ inputs.semantic_release_image_tag }}
+      image: ghcr.io/bitbrew-dev/reusable-workflows/semantic-release:${{ inputs.semantic_release_image_tag }}
     outputs:
       new_release: ${{ steps.get-next-version.outputs.new-release-published }}
       new_release_version: ${{ steps.get-next-version.outputs.new-release-version }}

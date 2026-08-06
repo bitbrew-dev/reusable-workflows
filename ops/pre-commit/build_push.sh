@@ -30,11 +30,11 @@ function build_images(){
         --build-arg NODE_VERSION=${NODE_VERSION} \
         --build-arg PREK_VERSION=${PREK_VERSION} \
         --build-arg PULUMI_VERSION=${PULUMI_VERSION} \
-        -t ghcr.io/benbenbang/pre-commit:latest \
-        -t ghcr.io/benbenbang/r-workflows/pre-commit:latest \
-        -t ghcr.io/benbenbang/reusable-workflows/pre-commit:latest \
-        -t ghcr.io/benbenbang/r-workflows/prek:latest \
-        -t ghcr.io/benbenbang/reusable-workflows/prek:latest \
+        -t ghcr.io/bitbrew-dev/pre-commit:latest \
+        -t ghcr.io/bitbrew-dev/r-workflows/pre-commit:latest \
+        -t ghcr.io/bitbrew-dev/reusable-workflows/pre-commit:latest \
+        -t ghcr.io/bitbrew-dev/r-workflows/prek:latest \
+        -t ghcr.io/bitbrew-dev/reusable-workflows/prek:latest \
         --push \
         -f $_CURRENT_DIR/Dockerfile \
         $_CURRENT_DIR/.

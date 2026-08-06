@@ -37,7 +37,7 @@ jobs:
       contents: read
       packages: read
     container:
-      image: ghcr.io/benbenbang/reusable-workflows/pre-commit:${{ inputs.image_version }}
+      image: ghcr.io/bitbrew-dev/reusable-workflows/pre-commit:${{ inputs.image_version }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RUN_ALL_FILES: ${{ inputs.run_all_files }}

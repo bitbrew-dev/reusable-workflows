@@ -21,7 +21,7 @@ on:
 jobs:
   semantic-release:
     if: github.event.inputs.prompt == 'true'
-    uses: benbenbang/reusable-workflows/.github/workflows/semantic-release.yml@main
+    uses: bitbrew-dev/reusable-workflows/.github/workflows/semantic-release.yml@main
     secrets: inherit
     with:
       new_version_title: "♻️ Reusable workflow"
