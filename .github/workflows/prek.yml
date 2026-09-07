@@ -4,30 +4,40 @@ on:
   workflow_call:
     inputs:
       image_version:
-        description: "prek docker image version"
+        description: prek Docker image version
         required: false
-        default: "latest"
+        default: latest
         type: string
       history_depth:
-        description: "0 means fetch the full history"
+        description: 0 means fetch the full history
         required: false
         default: 0
         type: number
       run_all_files:
-        description: "run all files or specific files"
+        description: Run on all files instead of files changed in the pull request
         required: false
-        default: "false"
-        type: string
+        default: false
+        type: boolean
       check_pr_title:
-        description: "check pr title"
+        description: Check the pull request title with the commit-msg hook
         required: false
         default: true
         type: boolean
       run_on_merge:
-        description: "run on merge"
+        description: Run on all files after a merge to the default branch
         required: false
         default: true
         type: boolean
+      go_version_file:
+        description: File from which actions/setup-go reads the Go version
+        required: false
+        default: go.mod
+        type: string
+      prek_skip:
+        description: hook id, files, stage to skip in the prek run
+        required: false
+        default: ""
+        type: string
 
 jobs:
   prek:
@@ -39,53 +49,76 @@ jobs:
     container:
       image: ghcr.io/bitbrew-dev/reusable-workflows/pre-commit:${{ inputs.image_version }}
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RUN_ALL_FILES: ${{ inputs.run_all_files }}
       CHECK_PR_TITLE: ${{ inputs.check_pr_title }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PREK_SKIP: ${{ inputs.prek_skip }}
+      RUN_ALL_FILES: ${{ inputs.run_all_files }}
       RUN_ON_MERGE: ${{ inputs.run_on_merge }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v6
         with:
           fetch-depth: ${{ inputs.history_depth }}
 
-      - name: prepare test environment
-        run: |
-          git config --global --add safe.directory $GITHUB_WORKSPACE
-          prek install && prek install --hook-type commit-msg
+      - name: Set up Go and restore Go caches
+        if: hashFiles(inputs.go_version_file) != ''
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ${{ inputs.go_version_file }}
+          cache: true
+          cache-dependency-path: |
+            **/go.mod
+            **/go.sum
 
-          git config --global user.email "${{ github.actor }}@bitbrew.dev"
-          git config --global user.name "${{ github.actor }}"
+      - name: Restore Rust caches
+        if: hashFiles('**/Cargo.toml') != ''
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: prek
+          save-if: >-
+            ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+          cache-on-failure: false
 
-      - name: cache prek hooks
-        uses: actions/cache@v4
+      - name: Restore prek hook cache
+        uses: actions/cache@v5
         with:
           path: ~/.cache/prek
-          key: ${{ runner.os }}-precommit-${{ hashFiles('.prek-config.yaml') }}
+          key: ${{ runner.os }}-prek-${{ hashFiles('.pre-commit-config.yaml', '.prek-config.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-precommit-
+            ${{ runner.os }}-prek-
 
-      - name: run prek on pull request (changed files)
-        if: ${{ github.ref != 'refs/heads/main' }}
+      - name: Prepare test environment
         shell: bash
         run: |
-          # run prek on all files or specific files
-          if [[ "${RUN_ALL_FILES}" == "true" ]]; then
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global user.email "${{ github.actor }}@bitbrew.dev"
+          git config --global user.name "${{ github.actor }}"
+          prek install
+          prek install --hook-type commit-msg
+
+      - name: Run prek on pull request
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          if [[ "$RUN_ALL_FILES" == "true" ]]; then
             prek run --all-files
           else
-            prek run --from-ref origin/main --to-ref HEAD
+            prek run \
+              --from-ref "${{ github.event.pull_request.base.sha }}" \
+              --to-ref "${{ github.event.pull_request.head.sha }}"
           fi
-        env:
-          RUN_ALL_FILES: ${{ inputs.run_all_files }}
 
-      - name: run prek on main branch (all files)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && inputs.run_on_merge
-        run: |
-          prek run --all-files
+      - name: Run prek on the default branch
+        if: >-
+          github.event_name == 'push' &&
+          github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+          inputs.run_on_merge
+        run: prek run --all-files
 
-      - name: check pr title
-        if: ${{ github.ref != 'refs/heads/main' && inputs.check_pr_title }}
+      - name: Check pull request title
+        if: github.event_name == 'pull_request' && inputs.check_pr_title
         env:
-          pull_request_title: ${{ github.event.pull_request.title }}
+          PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          echo "checking PR title: '${pull_request_title}'"
-          git commit --allow-empty -m "${pull_request_title}"
+          printf "Checking PR title: '%s'\n" "$PULL_REQUEST_TITLE"
+          git commit --allow-empty -m "$PULL_REQUEST_TITLE"
