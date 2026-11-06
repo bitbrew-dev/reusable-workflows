@@ -1,4 +1,4 @@
-ARG GO_IMAGE_VERSION=1.25-alpine
+ARG GO_IMAGE_VERSION=1.27-alpine
 ARG PYTHON_IMAGE_VERSION=3.13-slim-bookworm
 FROM golang:${GO_IMAGE_VERSION} AS go
 FROM python:${PYTHON_IMAGE_VERSION}
@@ -33,6 +33,15 @@ ENV PULUMI_VERSION=${PULUMI_VERSION}
 ARG RUST_VERSION=stable
 ENV RUST_VERSION=${RUST_VERSION}
 
+ARG TERRAFORM_VERSION=1.16.5
+ENV TERRAFORM_VERSION=${TERRAFORM_VERSION}
+
+ARG MISE_VERSION=v2026.11.3
+ENV MISE_VERSION=${MISE_VERSION}
+
+ARG TRIVY_VERSION=0.75.0
+ENV TRIVY_VERSION=${TRIVY_VERSION}
+
 WORKDIR /workspace
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -51,7 +60,7 @@ SHELL [ "/bin/bash", "-c", "-o", "pipefail" ]
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends git curl ca-certificates gnupg sudo \
-    unzip wget openssl iproute2 coreutils wireguard-tools build-essential && \
+    unzip wget openssl iproute2 coreutils wireguard-tools build-essential jq && \
     # ---- install nodejs ---- #
     curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
@@ -75,6 +84,15 @@ RUN apt-get update && \
     # ---- install hadolint ---- #
     if [ "$(uname -m)" = "x86_64" ]; then export PLATFORM="x86_64"; elif [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then export PLATFORM="arm64"; else echo "Unsupported architecture"; exit 1; fi && \
     curl -sSL https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-${PLATFORM} --output /usr/local/bin/hadolint && \
+    # ---- install terraform ---- #
+    if [ "$(uname -m)" = "x86_64" ]; then export TF_ARCH="amd64"; elif [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then export TF_ARCH="arm64"; else echo "Unsupported architecture"; exit 1; fi && \
+    curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${TF_ARCH}.zip" -o /tmp/terraform.zip && \
+    unzip -q /tmp/terraform.zip terraform -d /usr/local/bin && \
+    # ---- install mise ---- #
+    curl -fsSL https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise sh && \
+    # ---- install trivy ---- #
+    if [ "$(uname -m)" = "x86_64" ]; then export TRIVY_ARCH="64bit"; elif [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then export TRIVY_ARCH="ARM64"; else echo "Unsupported architecture"; exit 1; fi && \
+    curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz" | tar -xz -C /usr/local/bin trivy && \
     # ---- install pulumi ---- #
     # curl -fsSL https://get.pulumi.com | sh -s -- --version ${PULUMI_VERSION} && \
     # ---- install github cli ---- #
