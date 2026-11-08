@@ -33,6 +33,11 @@ on:
         required: false
         default: 0
         type: number
+      runner:
+        description: "run on github action - ubuntu-latest or blacksmith - blacksmith-4vcpu-ubuntu-2404"
+        type: string
+        default: ubuntu-latest
+        required: false
     outputs:
       new_release:
         description: "the new release version created by semantic release"
@@ -45,7 +50,7 @@ jobs:
   semantic-release:
     name: creating semantic release
     environment: ${{ inputs.environment }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     container:
       image: ghcr.io/bitbrew-dev/reusable-workflows/semantic-release:${{ inputs.semantic_release_image_tag }}
     outputs:
